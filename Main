@@ -1,0 +1,63 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+// Defina as credenciais da sua rede Wi-Fi
+const char* ssid = "nome-da-sua-rede-wifi";
+const char* password = "senha-da-sua-rede-wifi";
+
+// Defina as informações do servidor MQTT
+const char* mqtt_server = "endereço-do-servidor-mqtt";
+const int mqtt_port = 1883;
+const char* mqtt_username = "usuário-do-servidor-mqtt";
+const char* mqtt_password = "senha-do-servidor-mqtt";
+
+// Defina o tópico MQTT e a porta do outro ESP32
+const char* topic = "nome-do-topico";
+const int other_esp32_port = 4;
+
+// Defina o pino digital a ser acionado no outro ESP32
+const int other_esp32_pin = 2;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void setup() {
+  pinMode(other_esp32_pin, OUTPUT);
+
+  // Conecte-se à rede Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+  }
+
+  // Conecte-se ao servidor MQTT
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+  while (!client.connected()) {
+    if (client.connect("ESP32Client", mqtt_username, mqtt_password )) {
+      client.subscribe(topic);
+    }
+    else {
+      delay(1000);
+    }
+  }
+}
+
+void loop() {
+  // Verifique se há mensagens MQTT
+  client.loop();
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  // Converta a mensagem MQTT em um inteiro
+  int value = atoi((char*)payload);
+
+  // Acione a porta digital no outro ESP32
+  if (value == 1) {
+    WiFiClient otherClient;
+    if (otherClient.connect("endereço-ip-do-outro-esp32", other_esp32_port)) {
+      otherClient.write(other_esp32_pin);
+      otherClient.stop();
+    }
+  }
+}
